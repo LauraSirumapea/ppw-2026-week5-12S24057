@@ -9,13 +9,49 @@ use Illuminate\Validation\Rule;
 
 class BukuController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $bukus = Buku::with('kategori')
-            ->latest()
-            ->simplePaginate(10);
+        $search = $request->input('search');
+        $kategoriId = $request->input('kategori_id');
 
-        return view('buku.index', compact('bukus'));
+        $query = Buku::with('kategori');
+
+        // Search berdasarkan judul, ISBN, atau penulis
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('judul', 'like', '%' . $search . '%')
+                    ->orWhere('isbn', 'like', '%' . $search . '%')
+                    ->orWhere('penulis', 'like', '%' . $search . '%');
+            });
+        }
+
+        // Filter berdasarkan kategori
+        if ($kategoriId) {
+            $query->where('kategori_id', $kategoriId);
+        }
+
+        $bukus = $query
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        // Statistik
+        $totalBuku = Buku::count();
+        $totalKategori = Kategori::count();
+        $totalStok = Buku::sum('stok');
+
+        // Data kategori untuk filter
+        $kategoris = Kategori::orderBy('nama_kategori')->get();
+
+        return view('buku.index', compact(
+            'bukus',
+            'totalBuku',
+            'totalKategori',
+            'totalStok',
+            'kategoris',
+            'search',
+            'kategoriId'
+        ));
     }
 
     public function create()
